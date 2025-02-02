@@ -1,0 +1,102 @@
+services:
+  prodev-alx-db:
+    image: postgres:latest
+    container_name: prodev-alx-db
+    restart: always
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_HOST_AUTH_METHOD=scram-sha-256
+      - POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256
+    volumes:
+      - prodev-alx-db-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - prodev-alx-network
+
+  alx-pgbouncer:
+    image: edoburu/pgbouncer:latest
+    container_name: alx-pgbouncer
+    restart: always
+    environment:
+      - DB_USER=${POSTGRES_USER}
+      - DB_PASSWORD=${POSTGRES_PASSWORD}
+      - DB_HOST=prodev-alx-db
+      - AUTH_TYPE=scram-sha-256
+      - POOL_MODE=transaction
+      - LISTEN_PORT=6432
+    ports:
+      - "6432:6432"
+    volumes:
+      - ./pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini
+      - ./userlist.txt:/etc/pgbouncer/userlist.txt
+    networks:
+      - prodev-alx-network
+
+  message_broker:
+    image: rabbitmq:3-management
+    container_name: alx-bunny
+    restart: always
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - prodev-alx-network
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_DEFAULT_USER}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_DEFAULT_PASS}
+    
+  alx-travel-app:
+    build:
+      context: ./alx_travel_app
+    container_name: alx-travel-app
+    command: >
+      sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
+    volumes:
+      - ./alx_travel_app:/travel_app
+      - ./staticfiles:/travel_app/staticfiles
+    ports:
+      - "8000:8000"
+    depends_on:
+      - alx-pgbouncer
+      - prodev-alx-db
+      - message_broker
+    networks:
+      - prodev-alx-network
+
+  alx-celery-worker:
+    build:
+      context: ./alx_travel_app
+    container_name: alx-celery-worker
+    command: celery -A alx_travel_app.celery worker --pool=solo --loglevel=info
+    volumes:
+      - ./alx_travel_app:/travel_app
+    depends_on:
+      - alx-pgbouncer
+      - prodev-alx-db
+      - message_broker
+    networks:
+      - prodev-alx-network
+
+  alx-celery-beat:
+    build:
+      context: ./alx_travel_app
+    container_name: alx-celery-beat
+    command: celery -A alx_travel_app.celery beat --loglevel=info
+    volumes:
+      - ./alx_travel_app:/travel_app
+    depends_on:
+      - alx-pgbouncer
+      - prodev-alx-db
+      - message_broker
+    networks:
+      - prodev-alx-network
+
+volumes:
+  prodev-alx-db-data:
+
+networks:
+  prodev-alx-network:
+    driver: bridge
