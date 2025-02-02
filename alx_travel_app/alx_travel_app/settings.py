@@ -131,17 +131,12 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Celery settings
-celery_broker_url = env("CELERY_BROKER_URL")
-accept_content = ["json", "pickle"]
-task_serializer = "json"
-result_serializer = "json"
-celery_enable_utc = True  # set to False to use local timezone(i think)
-result_expires = 3600
-CELERY_WORKER_CONCURRENCY = 4  # number of workers
-
-# monitor celery tasks
-result_backend = env("CELERY_RESULT_BACKEND")
-
-# celery beat settings
-CELERY_BEAT_SCHEDULER = env("CELERY_BEAT_SCHEDULER")
+# Celery settings with RabbitMQ as the message broker
+CELERY_BROKER_URL = env("CELERY_BROKER_URL")  # Example: "amqp://guest:guest@localhost//"
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND")  # Example: "rpc://"
+CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers.DatabaseScheduler"
+CELERY_WORKER_CONCURRENCY = 4
+CELERY_ENABLE_UTC = True
+CELERY_TIMEZONE = "UTC"
